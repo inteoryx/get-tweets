@@ -97,7 +97,8 @@ def get_tweets(query_id, session, headers, variables, expected_total):
             break
 
         all_tweets.extend(next_tweets)
-        print(f"{len(all_tweets)} / {expected_total}", end="\r")
+        if args.output:
+            print(f"{len(all_tweets)} / {expected_total}", end="\r")
 
     all_tweets = [tweet for tweet in all_tweets if "full_text" in tweet and tweet.get("user_id_str", "") == variables["userId"]]
     return all_tweets
