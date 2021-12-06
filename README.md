@@ -16,7 +16,7 @@ Data you get:
 
 Requirements are:
 * requests - To make the http requests to get the tweet data
-* pandas - to print out a nice csv.
+
 
 # Usage
 
