@@ -1,8 +1,8 @@
 # get-tweets
-Get all of a user's tweets without an API key or doing any web scraping.  This script uses web requests to get all of a user's tweets as if you were an unauthenticated user.
+Get a user's tweets without an API key or doing any web scraping.  This script uses web requests to get a user's tweets as if you were an unauthenticated user.
 
 Data you get:
-* All of a user's tweets including retweets and replies
+* Tweets (including retweets & replies)
 * id
 * text
 * created_at
@@ -16,7 +16,7 @@ Data you get:
 
 Requirements are:
 * requests - To make the http requests to get the tweet data
-* pandas - to print out a nice csv.
+
 
 # Usage
 
