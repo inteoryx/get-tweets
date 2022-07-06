@@ -4,6 +4,7 @@ import csv
 import sys
 import json
 import argparse
+from time import sleep
 
 GUEST_TOKEN_ENDPOINT = "https://api.twitter.com/1.1/guest/activate.json"
 STATUS_ENDPOINT = "https://twitter.com/i/api/graphql/"
@@ -25,14 +26,19 @@ variables = {
     "withReactionsPerspective": False,
     "withSuperFollowsTweetFields": True,
     "withVoice": True,
-    "withV2Timeline": False
+    "withV2Timeline": False,
 }
 
+features = {
+    "standardized_nudges_misinfo": True, "dont_mention_me_view_api_enabled": True, "responsive_web_edit_tweet_api_enabled": True, "interactive_text_enabled": True, "responsive_web_enhance_cards_enabled": True, "responsive_web_uc_gql_enabled": True, "vibe_tweet_context_enabled": True,
+}
 
 def send_request(url, session_method, headers, params=None):
     if params:
         response = session_method(url, headers=headers, stream=True, params={
-                                  "variables": json.dumps(params)})
+                                  "variables": json.dumps(params),
+                                  "features": json.dumps(features)
+                            })
     else:
         response = session_method(url, headers=headers, stream=True)
 
@@ -40,7 +46,7 @@ def send_request(url, session_method, headers, params=None):
         print(response.request.url)
         print(response.status_code)
 
-    assert response.status_code == 200, f"Failed request to {url}.  {response.status_code}.  Please submit an issue including this information."
+    assert response.status_code == 200, f"Failed request to {url}.  {response.status_code}.  Please submit an issue including this information. {response.text}"
     result = [line.decode("utf-8") for line in response.iter_lines()]
     return "".join(result)
 
@@ -134,24 +140,15 @@ def get_id_and_tweet_count(session, headers, query_id, username):
 
     return ids[0], int(counts[0])
 
-
-if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser(description="Get tweets for a user.")
-    parser.add_argument(
-        "username", help="The username of the user to get tweets for.")
-    parser.add_argument(
-        "--output", help="The output file to write to.  If not specified, prints to stdout.")
-    args = parser.parse_args()
-
+def user_tweets(username):
+    print(f"Getting Tweets for {username}")
     session = requests.Session()
     headers = {}
 
-    username = args.username
-
     # One of the js files from original url holds the bearer token and query id.
     container = send_request(
-        f"https://twitter.com/{username}", session.get, headers)
+        f"https://twitter.com/{username}", session.get, headers
+    )
     js_files = re.findall("src=['\"]([^'\"()]*js)['\"]", container)
 
     bearer_token = None
@@ -195,7 +192,10 @@ if __name__ == "__main__":
     headers['x-guest-token'] = guest_token
 
     user_id, total_count = get_id_and_tweet_count(
-        session, headers, user_query_id, username)
+        session, headers, user_query_id, username
+    )
+
+    session.close()
 
     variables["userId"] = user_id
 
@@ -204,10 +204,48 @@ if __name__ == "__main__":
 
     for tweet in all_tweets:
         tweet["url"] = f"https://twitter.com/{username}/status/{tweet['id']}"
+        tweet["username"] = username
 
-    if not all_tweets:
-        print(f"No tweets found for {username}")
-        exit(1)
+    return all_tweets
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description="Get tweets for a user.")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument(
+        "--username", 
+        help="The username of the user to get tweets for.",
+        required=False
+    )
+    group.add_argument(
+        "--usersFile", 
+        help="A file containing a list of usernames to get tweets for.",
+        required=False
+    )    
+    parser.add_argument(
+        "--output", help="The output file to write to.  If not specified, prints to stdout."
+    )
+    
+    args = parser.parse_args()    
+
+    usernames = []
+
+    if args.username:
+        usernames.append(args.username)
+
+    if args.usersFile:
+        with open(args.usersFile) as f:
+            usernames.extend(f.read().splitlines())
+
+    all_tweets = []
+    for username in usernames:
+        try:
+            all_tweets.extend(user_tweets(username))
+            print("Sleeping 10s to avoid rate limit.")
+            sleep(10)
+        except Exception as e:
+            print(f"Failed to get tweets for {username}")
+            print(e)
 
     headers = all_tweets[0].keys()
     writer = csv.DictWriter(open(args.output, "w")
